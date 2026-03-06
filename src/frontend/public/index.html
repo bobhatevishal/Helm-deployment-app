@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="URL Shortener — Paste a long URL and get a short, shareable link instantly. Built on 4 microservice containers.">
+    <title>SnapLink — URL Shortener</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- Animated Background Canvas -->
+    <canvas id="particles-canvas"></canvas>
+
+    <div class="app">
+        <!-- Header -->
+        <header class="header" id="app-header">
+            <div class="logo">
+                <div class="logo-icon-wrap">
+                    <span class="logo-icon">⚡</span>
+                </div>
+                <div>
+                    <h1>SnapLink</h1>
+                    <p class="tagline">Lightning-fast URL shortening</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Tab Navigation -->
+        <nav class="tab-nav" id="tab-nav">
+            <button class="tab-btn active" data-tab="shorten" id="tab-btn-shorten">
+                <span class="tab-icon">🔗</span>
+                <span>Shorten</span>
+            </button>
+            <button class="tab-btn" data-tab="dashboard" id="tab-btn-dashboard">
+                <span class="tab-icon">📊</span>
+                <span>Dashboard</span>
+            </button>
+            <button class="tab-btn" data-tab="analytics" id="tab-btn-analytics">
+                <span class="tab-icon">📈</span>
+                <span>Analytics</span>
+            </button>
+        </nav>
+
+        <!-- ═══════ TAB 1: SHORTEN ═══════ -->
+        <section class="tab-content active" id="tab-shorten">
+            <!-- Shorten Card -->
+            <div class="glass-card shorten-card">
+                <h2 class="card-title">Paste your URL</h2>
+                <p class="card-desc">Enter any long URL and get a short, shareable link instantly</p>
+                <div class="input-group">
+                    <div class="input-wrapper">
+                        <span class="input-icon">🌐</span>
+                        <input type="url" id="url-input" placeholder="https://example.com/very-long-url..."
+                            autocomplete="off" spellcheck="false">
+                    </div>
+                    <button id="shorten-btn" onclick="shortenUrl()">
+                        <span class="btn-text">Shorten ⚡</span>
+                        <span class="btn-loader" hidden>
+                            <span class="spinner"></span>
+                        </span>
+                    </button>
+                </div>
+
+                <!-- Result -->
+                <div id="result" class="result" hidden>
+                    <div class="result-label">✨ Your short URL is ready!</div>
+                    <div class="result-row">
+                        <a id="result-link" href="#" target="_blank" class="short-link"></a>
+                        <button id="copy-btn" class="copy-btn" onclick="copyUrl()">
+                            <span>📋 Copy</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- URLs Table -->
+            <div class="glass-card urls-card">
+                <div class="section-header">
+                    <h2 class="card-title">📋 Recent URLs</h2>
+                    <div class="section-actions">
+                        <div class="search-wrapper">
+                            <span class="search-icon">🔍</span>
+                            <input type="text" id="search-input" placeholder="Search URLs..." oninput="searchUrls()">
+                        </div>
+                        <button class="refresh-btn" onclick="loadUrls()" id="refresh-btn">
+                            <span class="refresh-icon">🔄</span>
+                        </button>
+                    </div>
+                </div>
+                <div id="urls-table-container">
+                    <table class="urls-table">
+                        <thead>
+                            <tr>
+                                <th>Short Code</th>
+                                <th>Original URL</th>
+                                <th>Clicks</th>
+                                <th>Created</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="urls-body">
+                            <tr>
+                                <td colspan="5" class="empty-state">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════ TAB 2: DASHBOARD ═══════ -->
+        <section class="tab-content" id="tab-dashboard">
+            <div class="stats-grid">
+                <div class="stat-card" id="stat-total-urls">
+                    <div class="stat-icon">🔗</div>
+                    <div class="stat-value" id="stat-urls-value">—</div>
+                    <div class="stat-label">Total URLs</div>
+                </div>
+                <div class="stat-card" id="stat-total-clicks">
+                    <div class="stat-icon">👆</div>
+                    <div class="stat-value" id="stat-clicks-value">—</div>
+                    <div class="stat-label">Total Clicks</div>
+                </div>
+                <div class="stat-card" id="stat-cache-rate">
+                    <div class="stat-icon">⚡</div>
+                    <div class="stat-value" id="stat-cache-value">—</div>
+                    <div class="stat-label">Cache Hit Rate</div>
+                </div>
+                <div class="stat-card" id="stat-uptime">
+                    <div class="stat-icon">🟢</div>
+                    <div class="stat-value" id="stat-uptime-value">—</div>
+                    <div class="stat-label">API Uptime</div>
+                </div>
+            </div>
+
+            <!-- Top URLs -->
+            <div class="glass-card">
+                <h2 class="card-title">🏆 Top Performing URLs</h2>
+                <div id="top-urls-container">
+                    <div class="empty-state">Loading stats...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════ TAB 3: ANALYTICS ═══════ -->
+        <section class="tab-content" id="tab-analytics">
+            <div class="glass-card">
+                <div class="section-header">
+                    <h2 class="card-title">🕐 Recent Click Activity</h2>
+                    <button class="refresh-btn" onclick="loadAnalytics()" id="refresh-analytics-btn">
+                        <span class="refresh-icon">🔄</span>
+                    </button>
+                </div>
+                <div id="analytics-container">
+                    <div class="empty-state">Loading activity...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div id="health-status" class="health">
+                <span class="health-dot"></span>
+                <span class="health-text">Checking services...</span>
+            </div>
+            <p class="footer-info">
+                <span class="container-badge">🖥️ Web</span>
+                <span class="container-badge">⚙️ API</span>
+                <span class="container-badge">🗄️ DB</span>
+                <span class="container-badge">⚡ Cache</span>
+            </p>
+        </footer>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

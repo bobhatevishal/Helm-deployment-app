@@ -1,0 +1,64 @@
+version: "3.8"
+
+services:
+  # ─── 1. Frontend (Nginx — Custom Image) ─────────────────────
+  frontend:
+    build: ./frontend
+    container_name: snaplink-web
+    ports:
+      - "9090:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── 2. API (Python Flask — Custom Image) ───────────────────
+  api:
+    build: ./api
+    container_name: snaplink-api
+    environment:
+      - DATABASE_URL=postgresql://urlshort:urlshort123@db:5432/urlshort
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5000/api/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  # ─── 3. Database (PostgreSQL — Custom Image) ────────────────
+  db:
+    build: ./db
+    container_name: snaplink-db
+    environment:
+      POSTGRES_USER: urlshort
+      POSTGRES_PASSWORD: urlshort123
+      POSTGRES_DB: urlshort
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U urlshort" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ─── 4. Cache (Redis — Custom Image) ───────────────────────
+  redis:
+    build: ./cache
+    container_name: snaplink-cache
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pgdata:

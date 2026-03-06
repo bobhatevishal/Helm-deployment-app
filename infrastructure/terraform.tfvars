@@ -1,0 +1,9 @@
+project_name                = "helm-deployment-app"
+location                    = "Westus2"
+node_count                  = 1
+vm_size                     = "Standard_B2s" # "Standard_DS2_v2" "Standard_B2ats_v2"
+vnet_address_space          = ["10.0.0.0/16"]
+aks_subnet_address_prefixes = ["10.0.1.0/24"]
+app_subnet_address_prefixes = ["10.0.2.0/24"]
+aks_subnet_name             = "aks-subnet"
+app_subnet_name             = "app-subnet"
