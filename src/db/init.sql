@@ -4,8 +4,7 @@ CREATE TABLE IF NOT EXISTS urls (
     original_url TEXT NOT NULL,
     clicks      INTEGER DEFAULT 0,
     created_at  TIMESTAMP DEFAULT NOW()
-)
-
+);
 
 CREATE TABLE IF NOT EXISTS url_analytics (
     id          SERIAL PRIMARY KEY,
@@ -25,3 +24,5 @@ INSERT INTO urls (short_code, original_url, clicks) VALUES
     ('demo02', 'https://stackoverflow.com/questions', 18),
     ('demo03', 'https://docs.docker.com/compose/', 7)
 ON CONFLICT (short_code) DO NOTHING;
+
+
