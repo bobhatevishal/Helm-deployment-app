@@ -7,19 +7,11 @@ output "vnet_name" {
 }
 
 output "private_subnet_ids" {
-  value = [
-    azurerm_subnet.private["pvt-subnet-0"].id,
-    azurerm_subnet.private["pvt-subnet-1"].id,
-    azurerm_subnet.private["pvt-subnet-2"].id,
-    azurerm_subnet.private["pvt-subnet-3"].id
-  ]
+  value = [for s in azurerm_subnet.private : s.id]
 }
 
 output "public_subnet_ids" {
-  value = [
-    azurerm_subnet.public["pub-subnet-0"].id,
-    azurerm_subnet.public["pub-subnet-1"].id
-  ]
+  value = [for s in azurerm_subnet.public : s.id]
 }
 
 output "nsg_id" {
