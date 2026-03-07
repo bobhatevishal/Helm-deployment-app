@@ -384,17 +384,24 @@ async function checkHealth() {
 
     try {
         const response = await fetch('/api/health');
-        const data = await response.json();
-
+        
         if (response.ok) {
+            const data = await response.json();
             dot.className = 'health-dot ok';
             text.textContent = 'All services healthy';
         } else {
             dot.className = 'health-dot error';
+            let data;
+            try {
+                data = await response.json();
+            } catch (e) {
+                data = { api: "error (bad response)" };
+            }
+            
             const issues = Object.entries(data)
                 .filter(([, v]) => v !== 'ok')
                 .map(([k]) => k);
-            text.textContent = 'Issues: ' + issues.join(', ');
+            text.textContent = 'Issues: ' + (issues.join(', ') || 'server error');
         }
     } catch {
         dot.className = 'health-dot error';
