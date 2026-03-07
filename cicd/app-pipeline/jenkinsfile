@@ -1,0 +1,89 @@
+pipeline {
+    agent any
+
+    environment {
+        // Azure Credentials for Login
+        ARM_CLIENT_ID       = credentials('aks_sp_client_id')
+        ARM_CLIENT_SECRET   = credentials('aks_sp_secret')
+        ARM_TENANT_ID       = credentials('aks_sp_tenant_id')
+        ARM_SUBSCRIPTION_ID = '90266433-ff7d-467c-becb-788ee06b5e27'
+        
+        // Dynamic infrastructure parameters
+        // Hardcoded standard prod cluster for helm-deployment-app
+        ACR_NAME         = "helmdeploymentappprodacr"
+        AKS_CLUSTER_NAME = "helm-deployment-app-prod-aks"
+        RESOURCE_GROUP   = "helm-deployment-app-prod-rg"
+        IMAGE_TAG        = "${env.BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Azure Login') {
+            steps {
+                sh """
+                    az login --service-principal \
+                        --username "${env.ARM_CLIENT_ID}" \
+                        --password "${env.ARM_CLIENT_SECRET}" \
+                        --tenant "${env.ARM_TENANT_ID}"
+
+                    az account set --subscription "${env.ARM_SUBSCRIPTION_ID}"
+                """
+            }
+        }
+        
+        stage('Get AKS Credentials') {
+            steps {
+                sh "az aks get-credentials --resource-group ${RESOURCE_GROUP} --name ${AKS_CLUSTER_NAME} --overwrite-existing"
+            }
+        }
+
+        stage('ACR Login') {
+            steps {
+                sh "az acr login --name ${ACR_NAME}"
+            }
+        }
+
+        stage('Build & Push Images') {
+            steps {
+                script {
+                    def services = [
+                        'frontend': 'snaplink-web',
+                        'api'     : 'snaplink-api',
+                        'db'      : 'snaplink-db',
+                        'cache'   : 'snaplink-cache'
+                    ]
+
+                    services.each { dir, repo ->
+                        echo "Building and pushing ${repo}..."
+                        sh """
+                            docker build -t ${ACR_NAME}.azurecr.io/${repo}:${IMAGE_TAG} src/${dir}
+                            docker push ${ACR_NAME}.azurecr.io/${repo}:${IMAGE_TAG}
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Deploy Helm Chart') {
+            steps {
+                sh """
+                    helm upgrade --install snaplink kube/snaplink \
+                        --namespace default \
+                        --set global.imageRegistry=${ACR_NAME}.azurecr.io \
+                        --set global.imageTag=${IMAGE_TAG}
+                """
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo "Application pipeline deployed successfully."
+        }
+        failure {
+            echo "Application pipeline failed."
+        }
+    }
+}

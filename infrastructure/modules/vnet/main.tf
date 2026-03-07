@@ -1,31 +1,41 @@
+# ──────────────────────────────────────────────
+# Virtual Network
+# ──────────────────────────────────────────────
 resource "azurerm_virtual_network" "vnet" {
   name                = var.vnet_name
   address_space       = var.vnet_address_space
   location            = var.location
   resource_group_name = var.resource_group_name
+  tags                = var.tags
 }
 
-# Subnet 1: For AKS Nodes
-resource "azurerm_subnet" "aks_subnet" {
-  name                 = var.aks_subnet_name
+# ──────────────────────────────────────────────
+# Subnets
+resource "azurerm_subnet" "public" {
+  for_each             = var.public_subnets
+  name                 = each.key
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.vnet.name
-  address_prefixes     = var.aks_subnet_address_prefixes
+  address_prefixes     = [each.value]
 }
 
-# Subnet 2: For other Application/Data resources
-resource "azurerm_subnet" "app_subnet" {
-  name                 = var.app_subnet_name
+resource "azurerm_subnet" "private" {
+  for_each             = var.private_subnets
+  name                 = each.key
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.vnet.name
-  address_prefixes     = var.app_subnet_address_prefixes
+  address_prefixes     = [each.value]
+  service_endpoints    = ["Microsoft.ContainerRegistry"]
 }
 
-# Shared Network Security Group
+# ──────────────────────────────────────────────
+# Network Security Group
+# ──────────────────────────────────────────────
 resource "azurerm_network_security_group" "nsg" {
   name                = "${var.vnet_name}-nsg"
   location            = var.location
   resource_group_name = var.resource_group_name
+  tags                = var.tags
 
   security_rule {
     name                       = "AllowHTTPS"
@@ -38,16 +48,65 @@ resource "azurerm_network_security_group" "nsg" {
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
+
+  security_rule {
+    name                       = "AllowHTTP"
+    priority                   = 110
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "80"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "AllowVNetInbound"
+    priority                   = 200
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "VirtualNetwork"
+    destination_address_prefix = "VirtualNetwork"
+  }
+
+  security_rule {
+    name                       = "AllowAzureLoadBalancer"
+    priority                   = 210
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "AzureLoadBalancer"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "DenyAllInbound"
+    priority                   = 4096
+    direction                  = "Inbound"
+    access                     = "Deny"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
 }
 
-# Associate NSG with AKS Subnet
-resource "azurerm_subnet_network_security_group_association" "aks_nsg_assoc" {
-  subnet_id                 = azurerm_subnet.aks_subnet.id
-  network_security_group_id = azurerm_network_security_group.nsg.id
+# NSG ↔ Subnet Associations
+
+locals {
+  # Associate NSG with all private subnets mapping
+  nsg_subnets = { for k, v in azurerm_subnet.private : k => v.id }
 }
 
-# Associate NSG with App Subnet
-resource "azurerm_subnet_network_security_group_association" "app_nsg_assoc" {
-  subnet_id                 = azurerm_subnet.app_subnet.id
+resource "azurerm_subnet_network_security_group_association" "nsg_assoc" {
+  for_each                  = local.nsg_subnets
+  subnet_id                 = each.value
   network_security_group_id = azurerm_network_security_group.nsg.id
 }

@@ -1,28 +1,27 @@
 variable "vnet_name" {
-  type = string
+  type        = string
 }
 
 variable "vnet_address_space" {
-  type = list(string)
+  type        = list(string)
+}
+
+variable "public_subnets" {
+  type        = map(string)
+}
+
+variable "private_subnets" {
+  type        = map(string)
 }
 
 variable "resource_group_name" {
-  type = string
+  type        = string
 }
+
 variable "location" {
-  type = string
+  type        = string
 }
 
-variable "aks_subnet_name" {
-  type = string
-}
-variable "aks_subnet_address_prefixes" {
-  type = list(string)
-}
-
-variable "app_subnet_name" {
-  type = string
-}
-variable "app_subnet_address_prefixes" {
-  type = list(string)
+variable "tags" {
+  type        = map(string)
 }

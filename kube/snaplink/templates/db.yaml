@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+  labels:
+    app: db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      nodeSelector:
+        app: {{ .Values.db.nodeSelectorLabel }}
+      containers:
+        - name: db
+          image: "{{ .Values.global.imageRegistry }}/{{ .Values.db.repository }}:{{ .Values.global.imageTag }}"
+          imagePullPolicy: Always
+          ports:
+            - containerPort: {{ .Values.db.servicePort }}
+          env:
+            - name: POSTGRES_USER
+              value: "urlshort"
+            - name: POSTGRES_PASSWORD
+              value: "urlshort123"
+            - name: POSTGRES_DB
+              value: "urlshort"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+spec:
+  type: ClusterIP
+  selector:
+    app: db
+  ports:
+    - protocol: TCP
+      port: {{ .Values.db.servicePort }}
+      targetPort: {{ .Values.db.servicePort }}

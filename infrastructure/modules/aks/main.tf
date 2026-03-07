@@ -1,30 +1,145 @@
+# ──────────────────────────────────────────────
+# Log Analytics Workspace (for AKS monitoring)
+# ──────────────────────────────────────────────
+resource "azurerm_log_analytics_workspace" "aks" {
+  name                = "${var.cluster_name}-logs"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+  tags                = var.tags
+}
+
+# ──────────────────────────────────────────────
+# AKS Cluster
+# ──────────────────────────────────────────────
 resource "azurerm_kubernetes_cluster" "aks" {
   name                = var.cluster_name
   location            = var.location
   resource_group_name = var.resource_group_name
-  dns_prefix          = var.cluster_name
+  dns_prefix          = replace(var.cluster_name, "/[^a-zA-Z0-9-]/", "")
+  kubernetes_version  = var.kubernetes_version
+  sku_tier            = var.sku_tier
+  tags                = var.tags
 
   default_node_pool {
-    name       = "default"
-    node_count = var.node_count
-    vm_size    = var.vm_size
+    name                 = "system"
+    vm_size              = var.vm_size
+    vnet_subnet_id       = var.subnet_ids[0]
+    auto_scaling_enabled = true
+    node_count           = var.node_count
+    min_count            = var.min_count
+    max_count            = var.max_count
+    os_disk_size_gb      = var.os_disk_size_gb
+    type                 = "VirtualMachineScaleSets"
+
+    node_labels = {
+      "nodepool-type" = "system"
+      "environment"   = lookup(var.tags, "environment", "production")
+    }
   }
-  sku_tier = "Free"
 
   identity {
     type = "SystemAssigned"
   }
 
   network_profile {
-    network_plugin    = "kubenet"
+    network_plugin    = "azure"
     load_balancer_sku = "standard"
+    service_cidr      = "172.16.0.0/16"
+    dns_service_ip    = "172.16.0.10"
+  }
+
+  oms_agent {
+    log_analytics_workspace_id = azurerm_log_analytics_workspace.aks.id
+  }
+
+  azure_policy_enabled = true
+
+  lifecycle {
+    ignore_changes = [
+      default_node_pool[0].node_count, # Ignore count changes from auto-scaler
+    ]
   }
 }
 
-# This allows AKS to pull images from the ACR without credentials
+# ──────────────────────────────────────────────
+# ACR Pull Role Assignment
+# ──────────────────────────────────────────────
 resource "azurerm_role_assignment" "aks_acr_pull" {
   principal_id                     = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
   role_definition_name             = "AcrPull"
   scope                            = var.acr_id
   skip_service_principal_aad_check = true
+}
+
+# ──────────────────────────────────────────────
+# Application Node Pools
+# ──────────────────────────────────────────────
+resource "azurerm_kubernetes_cluster_node_pool" "frontend" {
+  name                  = "frontend"
+  kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
+  vm_size               = var.vm_size
+  vnet_subnet_id        = var.subnet_ids[0]
+  auto_scaling_enabled  = true
+  node_count            = var.node_count
+  min_count             = var.min_count
+  max_count             = var.max_count
+  os_disk_size_gb       = var.os_disk_size_gb
+  
+  node_labels = {
+    "app"         = "frontend"
+    "environment" = lookup(var.tags, "environment", "production")
+  }
+}
+
+resource "azurerm_kubernetes_cluster_node_pool" "api" {
+  name                  = "api"
+  kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
+  vm_size               = var.vm_size
+  vnet_subnet_id        = var.subnet_ids[1]
+  auto_scaling_enabled  = true
+  node_count            = var.node_count
+  min_count             = var.min_count
+  max_count             = var.max_count
+  os_disk_size_gb       = var.os_disk_size_gb
+  
+  node_labels = {
+    "app"         = "api"
+    "environment" = lookup(var.tags, "environment", "production")
+  }
+}
+
+resource "azurerm_kubernetes_cluster_node_pool" "db" {
+  name                  = "db"
+  kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
+  vm_size               = var.vm_size
+  vnet_subnet_id        = var.subnet_ids[2]
+  auto_scaling_enabled  = true
+  node_count            = var.node_count
+  min_count             = var.min_count
+  max_count             = var.max_count
+  os_disk_size_gb       = var.os_disk_size_gb
+  
+  node_labels = {
+    "app"         = "db"
+    "environment" = lookup(var.tags, "environment", "production")
+  }
+}
+
+resource "azurerm_kubernetes_cluster_node_pool" "redis" {
+  name                  = "redis"
+  kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
+  vm_size               = var.vm_size
+  vnet_subnet_id        = var.subnet_ids[3]
+  auto_scaling_enabled  = true
+  node_count            = var.node_count
+  min_count             = var.min_count
+  max_count             = var.max_count
+  os_disk_size_gb       = var.os_disk_size_gb
+  
+  node_labels = {
+    "app"         = "redis"
+    "environment" = lookup(var.tags, "environment", "production")
+  }
 }

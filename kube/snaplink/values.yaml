@@ -1,0 +1,23 @@
+global:
+  imageRegistry: "helmdeploymentappprodacr.azurecr.io"
+  imageTag: "latest"
+
+frontend:
+  repository: "snaplink-web"
+  servicePort: 80
+  nodeSelectorLabel: "frontend"
+
+api:
+  repository: "snaplink-api"
+  servicePort: 5000
+  nodeSelectorLabel: "api"
+
+db:
+  repository: "snaplink-db"
+  servicePort: 5432
+  nodeSelectorLabel: "db"
+
+redis:
+  repository: "snaplink-cache"
+  servicePort: 6379
+  nodeSelectorLabel: "redis"

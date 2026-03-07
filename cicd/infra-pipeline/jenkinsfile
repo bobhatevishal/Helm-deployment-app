@@ -1,0 +1,138 @@
+pipeline {
+    agent any
+
+    parameters {
+        choice(name: 'REGION', choices: ['westus2'], description: 'Deployment region')
+        choice(name: 'ENVIRONMENT', choices: ['dev', 'qa', 'uat', 'prod', 'dr'], description: 'Deployment environment')
+        choice(name: 'ACTION', choices: ['plan', 'apply', 'destroy'], description: 'Terraform action')
+        booleanParam(name: 'AUTO_APPROVE', defaultValue: false, description: 'Auto approve apply/destroy actions')
+    }
+
+    environment {
+        // Service Principal Credentials
+        ARM_CLIENT_ID       = credentials('aks_sp_client_id')
+        ARM_CLIENT_SECRET   = credentials('aks_sp_secret')
+        ARM_TENANT_ID       = credentials('aks_sp_tenant_id')
+        
+        // Paths and Files
+        VAR_FILE      = "infrastructure/terraform.tfvars"
+        PLAN_FILE     = "${params.ENVIRONMENT}.plan"
+    }
+
+    stages {
+        stage('Set Environment Variables') {
+            steps {
+                script {
+                    // Extract environment for credential naming (e.g., subscription_id_prod)
+                    def credId = "subscription_id_${params.ENVIRONMENT}"
+                    
+                    withCredentials([string(credentialsId: credId, variable: 'SUB_ID')]) {
+                        env.WORKLOAD_SUBSCRIPTION_ID = SUB_ID
+                    }
+
+                    echo """
+                    ENVIRONMENT                 : ${params.ENVIRONMENT}
+                    REGION                      : ${params.REGION}
+                    WORKLOAD_SUBSCRIPTION_ID    : ${env.WORKLOAD_SUBSCRIPTION_ID}
+                    VAR_FILE                    : ${env.VAR_FILE}
+                    """
+                }
+            }
+        }
+
+        stage('Azure Login') {
+            steps {
+                sh """
+                    az login --service-principal \
+                        --username "${env.ARM_CLIENT_ID}" \
+                        --password "${env.ARM_CLIENT_SECRET}" \
+                        --tenant "${env.ARM_TENANT_ID}"
+
+                    az account set --subscription "${env.WORKLOAD_SUBSCRIPTION_ID}"
+                """
+            }
+        }
+
+        stage('Terraform Init') {
+            steps {
+                sh """
+                    terraform init
+                """
+            }
+        }
+
+        stage('Terraform Validate') {
+            steps {
+                sh """
+                    terraform validate
+                """
+            }
+        }
+
+        stage('Terraform Plan') {
+            when {
+                expression { params.ACTION in ['plan', 'apply', 'destroy'] }
+            }
+            steps {
+                sh """
+                    terraform plan \
+                        -var="subscription_id=${env.WORKLOAD_SUBSCRIPTION_ID}" \
+                        -var-file="terraform.tfvars" \
+                        -out="../${env.PLAN_FILE}"
+                """
+            }
+        }
+
+        stage('Approval Required') {
+            when {
+                expression { (params.ACTION in ['apply', 'destroy']) && params.AUTO_APPROVE == false }
+            }
+            steps {
+                timeout(time: 20, unit: 'MINUTES') {
+                    input(
+                        message: """Approval required for Terraform action.
+                        Region: ${params.REGION}
+                        Environment: ${params.ENVIRONMENT}
+                        Action: ${params.ACTION}
+                        Proceed?"""
+                    )
+                }
+            }
+        }
+
+        stage('Terraform Apply') {
+            when {
+                expression { params.ACTION == 'apply' }
+            }
+            steps {
+                sh """
+                    terraform apply -auto-approve "../${env.PLAN_FILE}"
+                """
+            }
+        }
+
+        stage('Terraform Destroy') {
+            when {
+                expression { params.ACTION == 'destroy' }
+            }
+            steps {
+                sh """
+                    terraform destroy -auto-approve -var-file="terraform.tfvars"
+                """
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Pipeline completed. Cleaning workspace.'
+            cleanWs()
+        }
+        success {
+            echo "Terraform completed successfully for ${params.REGION} - ${params.ENVIRONMENT} with action ${params.ACTION}"
+        }
+        failure {
+            echo "Terraform failed for ${params.REGION} - ${params.ENVIRONMENT} with action ${params.ACTION}"
+        }
+    }
+}
