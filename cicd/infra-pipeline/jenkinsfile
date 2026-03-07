@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     parameters {
-        choice(name: 'REGION', choices: ['westus2'], description: 'Deployment region')
+        choice(name: 'REGION', choices: ['Canada Central'], description: 'Deployment region')
         choice(name: 'ENVIRONMENT', choices: ['dev', 'qa', 'uat', 'prod', 'dr'], description: 'Deployment environment')
         choice(name: 'ACTION', choices: ['plan', 'apply', 'destroy'], description: 'Terraform action')
         booleanParam(name: 'AUTO_APPROVE', defaultValue: false, description: 'Auto approve apply/destroy actions')
@@ -124,3 +124,4 @@ pipeline {
         }
     }
 }
+
