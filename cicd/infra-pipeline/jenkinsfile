@@ -13,6 +13,7 @@ pipeline {
         ARM_CLIENT_ID       = credentials('aks_sp_client_id')
         ARM_CLIENT_SECRET   = credentials('aks_sp_secret')
         ARM_TENANT_ID       = credentials('aks_sp_tenant_id')
+        ARM_SUBSCRIPTION_ID = credentials('subscription_id_dev')
         
         // Paths and Files
         VAR_FILE      = "infrastructure/terraform.tfvars"
@@ -20,26 +21,6 @@ pipeline {
     }
 
     stages {
-        stage('Set Environment Variables') {
-            steps {
-                script {
-                    // Extract environment for credential naming (e.g., subscription_id_prod)
-                    def credId = "subscription_id_${params.ENVIRONMENT}"
-                    
-                    withCredentials([string(credentialsId: credId, variable: 'SUB_ID')]) {
-                        env.WORKLOAD_SUBSCRIPTION_ID = SUB_ID
-                    }
-
-                    echo """
-                    ENVIRONMENT                 : ${params.ENVIRONMENT}
-                    REGION                      : ${params.REGION}
-                    WORKLOAD_SUBSCRIPTION_ID    : ${env.WORKLOAD_SUBSCRIPTION_ID}
-                    VAR_FILE                    : ${env.VAR_FILE}
-                    """
-                }
-            }
-        }
-
         stage('Azure Login') {
             steps {
                 sh """
@@ -48,7 +29,7 @@ pipeline {
                         --password "${env.ARM_CLIENT_SECRET}" \
                         --tenant "${env.ARM_TENANT_ID}"
 
-                    az account set --subscription "${env.WORKLOAD_SUBSCRIPTION_ID}"
+                    az account set --subscription "${env.ARM_SUBSCRIPTION_ID}"
                 """
             }
         }
@@ -56,6 +37,7 @@ pipeline {
         stage('Terraform Init') {
             steps {
                 sh """
+                    cd infrastructure
                     terraform init
                 """
             }
@@ -64,6 +46,7 @@ pipeline {
         stage('Terraform Validate') {
             steps {
                 sh """
+                    cd infrastructure
                     terraform validate
                 """
             }
@@ -75,8 +58,9 @@ pipeline {
             }
             steps {
                 sh """
+                    cd infrastructure
                     terraform plan \
-                        -var="subscription_id=${env.WORKLOAD_SUBSCRIPTION_ID}" \
+                        -var="subscription_id=${env.ARM_SUBSCRIPTION_ID}" \
                         -var-file="terraform.tfvars" \
                         -out="../${env.PLAN_FILE}"
                 """
@@ -106,6 +90,7 @@ pipeline {
             }
             steps {
                 sh """
+                    cd infrastructure
                     terraform apply -auto-approve "../${env.PLAN_FILE}"
                 """
             }
@@ -117,7 +102,10 @@ pipeline {
             }
             steps {
                 sh """
-                    terraform destroy -auto-approve -var-file="terraform.tfvars"
+                    cd infrastructure
+                    terraform destroy -auto-approve \
+                        -var="subscription_id=${env.ARM_SUBSCRIPTION_ID}" \
+                        -var-file="terraform.tfvars"
                 """
             }
         }

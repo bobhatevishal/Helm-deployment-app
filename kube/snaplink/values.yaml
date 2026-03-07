@@ -5,19 +5,19 @@ global:
 frontend:
   repository: "snaplink-web"
   servicePort: 80
-  nodeSelectorLabel: "frontend"
+  servicePort: 80
 
 api:
   repository: "snaplink-api"
   servicePort: 5000
-  nodeSelectorLabel: "api"
+  servicePort: 5000
 
 db:
   repository: "snaplink-db"
   servicePort: 5432
-  nodeSelectorLabel: "db"
+  servicePort: 5432
 
 redis:
   repository: "snaplink-cache"
   servicePort: 6379
-  nodeSelectorLabel: "redis"
+  servicePort: 6379

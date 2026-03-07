@@ -14,8 +14,6 @@ spec:
       labels:
         app: api
     spec:
-      nodeSelector:
-        app: {{ .Values.api.nodeSelectorLabel }}
       containers:
         - name: api
           image: "{{ .Values.global.imageRegistry }}/{{ .Values.api.repository }}:{{ .Values.global.imageTag }}"

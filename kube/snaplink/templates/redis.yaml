@@ -14,8 +14,6 @@ spec:
       labels:
         app: redis
     spec:
-      nodeSelector:
-        app: {{ .Values.redis.nodeSelectorLabel }}
       containers:
         - name: redis
           image: "{{ .Values.global.imageRegistry }}/{{ .Values.redis.repository }}:{{ .Values.global.imageTag }}"

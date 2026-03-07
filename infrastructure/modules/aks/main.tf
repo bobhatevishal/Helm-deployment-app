@@ -1,6 +1,4 @@
-# ──────────────────────────────────────────────
 # Log Analytics Workspace (for AKS monitoring)
-# ──────────────────────────────────────────────
 resource "azurerm_log_analytics_workspace" "aks" {
   name                = "${var.cluster_name}-logs"
   location            = var.location
@@ -10,9 +8,7 @@ resource "azurerm_log_analytics_workspace" "aks" {
   tags                = var.tags
 }
 
-# ──────────────────────────────────────────────
 # AKS Cluster
-# ──────────────────────────────────────────────
 resource "azurerm_kubernetes_cluster" "aks" {
   name                = var.cluster_name
   location            = var.location
@@ -63,9 +59,8 @@ resource "azurerm_kubernetes_cluster" "aks" {
   }
 }
 
-# ──────────────────────────────────────────────
+
 # ACR Pull Role Assignment
-# ──────────────────────────────────────────────
 resource "azurerm_role_assignment" "aks_acr_pull" {
   principal_id                     = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
   role_definition_name             = "AcrPull"
@@ -73,73 +68,4 @@ resource "azurerm_role_assignment" "aks_acr_pull" {
   skip_service_principal_aad_check = true
 }
 
-# ──────────────────────────────────────────────
-# Application Node Pools
-# ──────────────────────────────────────────────
-resource "azurerm_kubernetes_cluster_node_pool" "frontend" {
-  name                  = "frontend"
-  kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
-  vm_size               = var.vm_size
-  vnet_subnet_id        = var.subnet_ids[0]
-  auto_scaling_enabled  = true
-  node_count            = var.node_count
-  min_count             = var.min_count
-  max_count             = var.max_count
-  os_disk_size_gb       = var.os_disk_size_gb
-  
-  node_labels = {
-    "app"         = "frontend"
-    "environment" = lookup(var.tags, "environment", "production")
-  }
-}
 
-resource "azurerm_kubernetes_cluster_node_pool" "api" {
-  name                  = "api"
-  kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
-  vm_size               = var.vm_size
-  vnet_subnet_id        = var.subnet_ids[1]
-  auto_scaling_enabled  = true
-  node_count            = var.node_count
-  min_count             = var.min_count
-  max_count             = var.max_count
-  os_disk_size_gb       = var.os_disk_size_gb
-  
-  node_labels = {
-    "app"         = "api"
-    "environment" = lookup(var.tags, "environment", "production")
-  }
-}
-
-resource "azurerm_kubernetes_cluster_node_pool" "db" {
-  name                  = "db"
-  kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
-  vm_size               = var.vm_size
-  vnet_subnet_id        = var.subnet_ids[2]
-  auto_scaling_enabled  = true
-  node_count            = var.node_count
-  min_count             = var.min_count
-  max_count             = var.max_count
-  os_disk_size_gb       = var.os_disk_size_gb
-  
-  node_labels = {
-    "app"         = "db"
-    "environment" = lookup(var.tags, "environment", "production")
-  }
-}
-
-resource "azurerm_kubernetes_cluster_node_pool" "redis" {
-  name                  = "redis"
-  kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
-  vm_size               = var.vm_size
-  vnet_subnet_id        = var.subnet_ids[3]
-  auto_scaling_enabled  = true
-  node_count            = var.node_count
-  min_count             = var.min_count
-  max_count             = var.max_count
-  os_disk_size_gb       = var.os_disk_size_gb
-  
-  node_labels = {
-    "app"         = "redis"
-    "environment" = lookup(var.tags, "environment", "production")
-  }
-}

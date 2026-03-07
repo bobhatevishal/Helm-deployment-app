@@ -14,8 +14,6 @@ spec:
       labels:
         app: frontend
     spec:
-      nodeSelector:
-        app: {{ .Values.frontend.nodeSelectorLabel }}
       containers:
         - name: frontend
           image: "{{ .Values.global.imageRegistry }}/{{ .Values.frontend.repository }}:{{ .Values.global.imageTag }}"
