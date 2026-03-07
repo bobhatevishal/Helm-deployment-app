@@ -1,6 +1,4 @@
-# ──────────────────────────────────────────────
 # Virtual Network
-# ──────────────────────────────────────────────
 resource "azurerm_virtual_network" "vnet" {
   name                = var.vnet_name
   address_space       = var.vnet_address_space
@@ -9,7 +7,6 @@ resource "azurerm_virtual_network" "vnet" {
   tags                = var.tags
 }
 
-# ──────────────────────────────────────────────
 # Subnets
 resource "azurerm_subnet" "public" {
   for_each             = var.public_subnets
@@ -28,9 +25,7 @@ resource "azurerm_subnet" "private" {
   service_endpoints    = ["Microsoft.ContainerRegistry"]
 }
 
-# ──────────────────────────────────────────────
 # Network Security Group
-# ──────────────────────────────────────────────
 resource "azurerm_network_security_group" "nsg" {
   name                = "${var.vnet_name}-nsg"
   location            = var.location
@@ -110,3 +105,4 @@ resource "azurerm_subnet_network_security_group_association" "nsg_assoc" {
   subnet_id                 = each.value
   network_security_group_id = azurerm_network_security_group.nsg.id
 }
+
