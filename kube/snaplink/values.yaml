@@ -5,19 +5,16 @@ global:
 frontend:
   repository: "snaplink-web"
   servicePort: 80
-  servicePort: 80
 
 api:
   repository: "snaplink-api"
-  servicePort: 5000
   servicePort: 5000
 
 db:
   repository: "snaplink-db"
   servicePort: 5432
-  servicePort: 5432
 
 redis:
   repository: "snaplink-cache"
   servicePort: 6379
-  servicePort: 6379
+
