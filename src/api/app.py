@@ -30,7 +30,22 @@ import redis
 app = Flask(__name__)
 CORS(app)
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://urlshort:urlshort123@db:5432/urlshort")
+# Database Configuration (Component-based)
+DB_USER = os.environ.get("DB_USER")
+DB_PASS = os.environ.get("DB_PASS")
+DB_HOST = os.environ.get("DB_HOST", "db")
+DB_NAME = os.environ.get("DB_NAME", "urlshort")
+DB_PORT = os.environ.get("DB_PORT", "5432")
+
+# Safety Check - Fail fast if credentials are missing
+if not DB_USER or not DB_PASS:
+    print("❌ CRITICAL ERROR: DB_USER or DB_PASS not set in environment!")
+    # In a real environment, you might want to exit(1) here
+    # For now, we will let it crash on first connect for visibility
+
+# Constructing fallback URL for legacy support if needed (internal use)
+DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
 
 # Redis client
@@ -44,39 +59,52 @@ start_time = time.time()
 # Database helpers
 # ──────────────────────────────────────────────
 def get_db():
-    """Get a new database connection."""
-    conn = psycopg2.connect(DATABASE_URL)
-    conn.autocommit = True
-    return conn
+    """Get a new database connection using individual parameters."""
+    return psycopg2.connect(
+        user=DB_USER,
+        password=DB_PASS,
+        host=DB_HOST,
+        port=DB_PORT,
+        database=DB_NAME
+    )
 
 
 def init_db():
     """Create the urls table if it doesn't exist."""
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS urls (
-            id         SERIAL PRIMARY KEY,
-            short_code VARCHAR(10) UNIQUE NOT NULL,
-            original_url TEXT NOT NULL,
-            clicks     INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT NOW()
-        );
-    """)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS url_analytics (
-            id         SERIAL PRIMARY KEY,
-            short_code VARCHAR(10) NOT NULL,
-            clicked_at TIMESTAMP DEFAULT NOW(),
-            user_agent TEXT,
-            ip_address VARCHAR(45)
-        );
-    """)
-    conn.close()
+    conn = None
+    try:
+        conn = get_db()
+        conn.autocommit = True
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS urls (
+                id         SERIAL PRIMARY KEY,
+                short_code VARCHAR(10) UNIQUE NOT NULL,
+                original_url TEXT NOT NULL,
+                clicks     INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS url_analytics (
+                id         SERIAL PRIMARY KEY,
+                short_code VARCHAR(10) NOT NULL,
+                clicked_at TIMESTAMP DEFAULT NOW(),
+                user_agent TEXT,
+                ip_address VARCHAR(45)
+            );
+        """)
+        print("✅ Database initialized")
+    except Exception as e:
+        print(f"❌ Database initialization failed: {e}")
+    finally:
+        if conn:
+            conn.close()
 
 
-def wait_for_db(max_retries=10, delay=2):
+def wait_for_db(max_retries=15, delay=3):
     """Wait for the database to become available."""
+    print(f"Connecting to DB: {DB_USER}@{DB_HOST}:{DB_PORT}/{DB_NAME}")
     for attempt in range(max_retries):
         try:
             conn = get_db()
@@ -113,6 +141,17 @@ def get_uptime():
 # ──────────────────────────────────────────────
 # Routes
 # ──────────────────────────────────────────────
+@app.route("/api")
+@app.route("/api/")
+def welcome():
+    """Simple API welcome message for testing."""
+    return jsonify({
+        "status": "online",
+        "message": "SnapLink API is powered up!",
+        "version": "1.1.0"
+    })
+
+
 @app.route("/api/health")
 def health():
     """Health check — verifies DB and Redis connectivity."""
@@ -137,8 +176,7 @@ def health():
 @app.route("/api/shorten", methods=["POST"])
 def shorten():
     """Create a short URL.
-    Body: { "url": "https://example.com/very-long-url" }
-    Returns: { "short_code": "abc123", "short_url": "http://localhost:8080/api/abc123" }
+    Returns the real host URL as the short URL base.
     """
     data = request.get_json(silent=True)
     if not data or not data.get("url"):
@@ -152,6 +190,7 @@ def shorten():
 
     # Save to PostgreSQL
     conn = get_db()
+    conn.autocommit = True
     cur = conn.cursor()
     cur.execute(
         "INSERT INTO urls (short_code, original_url) VALUES (%s, %s) RETURNING id, created_at",
@@ -163,11 +202,15 @@ def shorten():
     # Cache in Redis (expire after 1 hour)
     cache.setex(f"url:{short_code}", 3600, original_url)
 
+    # Use the actual host from headers for the public URL
+    public_host = request.headers.get("X-Forwarded-Host", request.host)
+    scheme = request.headers.get("X-Forwarded-Proto", "http")
+    
     return jsonify({
         "id": row[0],
         "short_code": short_code,
         "original_url": original_url,
-        "short_url": f"{request.host_url}api/{short_code}",
+        "short_url": f"{scheme}://{public_host}/api/{short_code}",
         "created_at": row[1].isoformat(),
     }), 201
 
