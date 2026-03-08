@@ -21,8 +21,22 @@ spec:
           ports:
             - containerPort: {{ .Values.api.servicePort }}
           env:
-            - name: DATABASE_URL
-              value: "postgresql://{{ .Values.db.user }}:{{ .Values.db.password }}@db:{{ .Values.db.servicePort }}/{{ .Values.db.name }}"
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: snaplink-db-creds
+                  key: username
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: snaplink-db-creds
+                  key: password
+            - name: DB_HOST
+              value: "db"
+            - name: DB_NAME
+              value: "{{ .Values.db.name }}"
+            - name: DB_PORT
+              value: "{{ .Values.db.servicePort }}"
             - name: REDIS_URL
               value: "redis://redis:{{ .Values.redis.servicePort }}/0"
 ---
