@@ -22,9 +22,9 @@ spec:
             - containerPort: {{ .Values.api.servicePort }}
           env:
             - name: DATABASE_URL
-              value: "postgresql://urlshort:urlshort123@db:5432/urlshort"
+              value: "postgresql://{{ .Values.db.user }}:{{ .Values.db.password }}@db:{{ .Values.db.servicePort }}/{{ .Values.db.name }}"
             - name: REDIS_URL
-              value: "redis://redis:6379/0"
+              value: "redis://redis:{{ .Values.redis.servicePort }}/0"
 ---
 apiVersion: v1
 kind: Service
