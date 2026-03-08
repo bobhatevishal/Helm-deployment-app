@@ -2,21 +2,19 @@ pipeline {
     agent any
 
     parameters {
-        choice(name: 'REGION', choices: ['Canada Central'], description: 'Deployment region')
         choice(name: 'ENVIRONMENT', choices: ['dev', 'qa', 'uat', 'prod', 'dr'], description: 'Deployment environment')
         choice(name: 'ACTION', choices: ['plan', 'apply', 'destroy'], description: 'Terraform action')
         booleanParam(name: 'AUTO_APPROVE', defaultValue: false, description: 'Auto approve apply/destroy actions')
     }
 
     environment {
+        SUB_CRED_ID         = "subscription_id_${params.ENVIRONMENT}"
         // Service Principal Credentials
         ARM_CLIENT_ID       = credentials('aks_sp_client_id')
         ARM_CLIENT_SECRET   = credentials('aks_sp_secret')
         ARM_TENANT_ID       = credentials('aks_sp_tenant_id')
-        ARM_SUBSCRIPTION_ID = credentials('subscription_id_dev')
-        
+        ARM_SUBSCRIPTION_ID = credentials("${env.SUB_CRED_ID}")
         // Paths and Files
-        VAR_FILE      = "infrastructure/terraform.tfvars"
         PLAN_FILE     = "${params.ENVIRONMENT}.plan"
     }
 
@@ -36,19 +34,13 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
-                sh """
-                    cd infrastructure
-                    terraform init
-                """
+                sh "terraform -chdir=infrastructure init"
             }
         }
 
         stage('Terraform Validate') {
             steps {
-                sh """
-                    cd infrastructure
-                    terraform validate
-                """
+                sh "terraform -chdir=infrastructure validate"
             }
         }
 
@@ -58,8 +50,7 @@ pipeline {
             }
             steps {
                 sh """
-                    cd infrastructure
-                    terraform plan \
+                    terraform -chdir=infrastructure plan \
                         -var="subscription_id=${env.ARM_SUBSCRIPTION_ID}" \
                         -var-file="terraform.tfvars" \
                         -out="../${env.PLAN_FILE}"
@@ -75,7 +66,6 @@ pipeline {
                 timeout(time: 20, unit: 'MINUTES') {
                     input(
                         message: """Approval required for Terraform action.
-                        Region: ${params.REGION}
                         Environment: ${params.ENVIRONMENT}
                         Action: ${params.ACTION}
                         Proceed?"""
@@ -89,10 +79,7 @@ pipeline {
                 expression { params.ACTION == 'apply' }
             }
             steps {
-                sh """
-                    cd infrastructure
-                    terraform apply -auto-approve "../${env.PLAN_FILE}"
-                """
+                sh "terraform -chdir=infrastructure apply -auto-approve ../${env.PLAN_FILE}"
             }
         }
 
@@ -102,8 +89,7 @@ pipeline {
             }
             steps {
                 sh """
-                    cd infrastructure
-                    terraform destroy -auto-approve \
+                    terraform -chdir=infrastructure destroy -auto-approve \
                         -var="subscription_id=${env.ARM_SUBSCRIPTION_ID}" \
                         -var-file="terraform.tfvars"
                 """
@@ -113,15 +99,13 @@ pipeline {
 
     post {
         always {
-            echo 'Pipeline completed. Cleaning workspace.'
-            cleanWs()
+            echo 'Pipeline completed.'
         }
         success {
-            echo "Terraform completed successfully for ${params.REGION} - ${params.ENVIRONMENT} with action ${params.ACTION}"
+            echo "Terraform completed successfully for ${params.ENVIRONMENT} with action ${params.ACTION}"
         }
         failure {
-            echo "Terraform failed for ${params.REGION} - ${params.ENVIRONMENT} with action ${params.ACTION}"
+            echo "Terraform failed for ${params.ENVIRONMENT} with action ${params.ACTION}"
         }
     }
 }
-
