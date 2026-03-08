@@ -22,11 +22,11 @@ spec:
             - containerPort: {{ .Values.db.servicePort }}
           env:
             - name: POSTGRES_USER
-              value: "urlshort"
+              value: "{{ .Values.db.user }}"
             - name: POSTGRES_PASSWORD
-              value: "urlshort123"
+              value: "{{ .Values.db.password }}"
             - name: POSTGRES_DB
-              value: "urlshort"
+              value: "{{ .Values.db.name }}"
 ---
 apiVersion: v1
 kind: Service
