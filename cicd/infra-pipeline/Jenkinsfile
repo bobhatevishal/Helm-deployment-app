@@ -8,104 +8,111 @@ pipeline {
     }
 
     environment {
-        SUB_CRED_ID         = "subscription_id_${env?.ENVIRONMENT ?: params?.ENVIRONMENT ?: 'dev'}"
-        // Service Principal Credentials
+        // Service Principal Credentials (Global)
         ARM_CLIENT_ID       = credentials('aks_sp_client_id')
         ARM_CLIENT_SECRET   = credentials('aks_sp_secret')
         ARM_TENANT_ID       = credentials('aks_sp_tenant_id')
-        ARM_SUBSCRIPTION_ID = credentials("${env.SUB_CRED_ID}")
-        // Paths and Files
-        PLAN_FILE     = "${env?.ENVIRONMENT ?: params?.ENVIRONMENT ?: 'dev'}.plan"
+        ENV_NAME            = "${env.ENVIRONMENT ?: 'dev'}"
+        PLAN_FILE           = "${env.ENVIRONMENT ?: 'dev'}.plan"
     }
 
     stages {
-        stage('Azure Login') {
-            steps {
-                sh """
-                    az login --service-principal \
-                        --username "${env.ARM_CLIENT_ID}" \
-                        --password "${env.ARM_CLIENT_SECRET}" \
-                        --tenant "${env.ARM_TENANT_ID}"
+        stage('Infrastructure Setup') {
+            environment {
+                SUB_CRED_ID         = "subscription_id_${env.ENVIRONMENT ?: 'dev'}"
+                ARM_SUBSCRIPTION_ID = credentials("${env.SUB_CRED_ID}")
+            }
+            stages {
+                stage('Azure Login') {
+                    steps {
+                        sh """
+                            az login --service-principal \
+                                --username "${env.ARM_CLIENT_ID}" \
+                                --password "${env.ARM_CLIENT_SECRET}" \
+                                --tenant "${env.ARM_TENANT_ID}"
 
-                    az account set --subscription "${env.ARM_SUBSCRIPTION_ID}"
-                """
-            }
-        }
-
-        stage('Terraform Init') {
-            steps {
-                sh "terraform -chdir=infrastructure init"
-            }
-        }
-
-        stage('Terraform Validate') {
-            steps {
-                sh "terraform -chdir=infrastructure validate"
-            }
-        }
-
-        stage('Terraform Plan') {
-            when {
-                expression { params.ACTION in ['plan', 'apply', 'destroy'] }
-            }
-            steps {
-                sh """
-                    terraform -chdir=infrastructure plan \
-                        -var="subscription_id=${env.ARM_SUBSCRIPTION_ID}" \
-                        -var-file="terraform.tfvars" \
-                        -out="../${env.PLAN_FILE}"
-                """
-            }
-        }
-
-        stage('Approval Required') {
-            when {
-                expression { (params.ACTION in ['apply', 'destroy']) && params.AUTO_APPROVE == false }
-            }
-            steps {
-                timeout(time: 20, unit: 'MINUTES') {
-                    input(
-                        message: """Approval required for Terraform action.
-                        Environment: ${env?.ENVIRONMENT ?: params?.ENVIRONMENT ?: 'dev'}
-                        Action: ${env?.ACTION ?: params?.ACTION ?: 'plan'}
-                        Proceed?"""
-                    )
+                            az account set --subscription "${env.ARM_SUBSCRIPTION_ID}"
+                        """
+                    }
                 }
-            }
-        }
 
-        stage('Terraform Apply') {
-            when {
-                expression { params.ACTION == 'apply' }
-            }
-            steps {
-                sh "terraform -chdir=infrastructure apply -auto-approve ../${env.PLAN_FILE}"
-            }
-        }
+                stage('Terraform Init') {
+                    steps {
+                        sh "terraform -chdir=infrastructure init"
+                    }
+                }
 
-        stage('Terraform Destroy') {
-            when {
-                expression { params.ACTION == 'destroy' }
-            }
-            steps {
-                sh """
-                    terraform -chdir=infrastructure destroy -auto-approve \
-                        -var="subscription_id=${env.ARM_SUBSCRIPTION_ID}" \
-                        -var-file="terraform.tfvars"
-                """
+                stage('Terraform Validate') {
+                    steps {
+                        sh "terraform -chdir=infrastructure validate"
+                    }
+                }
+
+                stage('Terraform Plan') {
+                    when {
+                        expression { params.ACTION in ['plan', 'apply', 'destroy'] }
+                    }
+                    steps {
+                        sh """
+                            terraform -chdir=infrastructure plan \
+                                -var="subscription_id=${env.ARM_SUBSCRIPTION_ID}" \
+                                -var-file="terraform.tfvars" \
+                                -out="../${env.PLAN_FILE}"
+                        """
+                    }
+                }
+
+                stage('Approval Required') {
+                    when {
+                        expression { (params.ACTION in ['apply', 'destroy']) && params.AUTO_APPROVE == false }
+                    }
+                    steps {
+                        timeout(time: 20, unit: 'MINUTES') {
+                            input(
+                                message: """Approval required for Terraform action.
+                                Environment: ${env.ENV_NAME}
+                                Action: ${params.ACTION}
+                                Proceed?"""
+                            )
+                        }
+                    }
+                }
+
+                stage('Terraform Apply') {
+                    when {
+                        expression { params.ACTION == 'apply' }
+                    }
+                    steps {
+                        sh "terraform -chdir=infrastructure apply -auto-approve ../${env.PLAN_FILE}"
+                    }
+                }
+
+                stage('Terraform Destroy') {
+                    when {
+                        expression { params.ACTION == 'destroy' }
+                    }
+                    steps {
+                        sh """
+                            terraform -chdir=infrastructure destroy -auto-approve \
+                                -var="subscription_id=${env.ARM_SUBSCRIPTION_ID}" \
+                                -var-file="terraform.tfvars"
+                        """
+                    }
+                }
             }
         }
     }
 
     post {
         always {
-            echo 'Pipeline completed.'
+            echo 'Pipeline completed. Cleaning workspace.'
+            cleanWs()
         }
         success {
-            echo "Terraform completed successfully for ${env?.ENVIRONMENT ?: params?.ENVIRONMENT ?: 'dev'} with action ${env?.ACTION ?: params?.ACTION ?: 'plan'}"
+            echo "Terraform completed successfully for ${env.ENV_NAME} with action ${params.ACTION}"
         }
         failure {
-            echo "Terraform failed for ${env?.ENVIRONMENT ?: params?.ENVIRONMENT ?: 'dev'} with action ${env?.ACTION ?: params?.ACTION ?: 'plan'}"
+            echo "Terraform failed for ${env.ENV_NAME} with action ${params.ACTION}"
         }
     }
 }
