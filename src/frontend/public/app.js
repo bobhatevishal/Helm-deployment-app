@@ -141,6 +141,7 @@ async function shortenUrl() {
         }
 
         // Show result
+        // Show result
         const shortUrl = window.location.origin + '/api/' + data.short_code;
         const link = document.getElementById('result-link');
         link.href = shortUrl;
@@ -384,7 +385,7 @@ async function checkHealth() {
 
     try {
         const response = await fetch('/api/health');
-        
+
         if (response.ok) {
             const data = await response.json();
             dot.className = 'health-dot ok';
@@ -397,7 +398,7 @@ async function checkHealth() {
             } catch (e) {
                 data = { api: "error (bad response)" };
             }
-            
+
             const issues = Object.entries(data)
                 .filter(([, v]) => v !== 'ok')
                 .map(([k]) => k);
