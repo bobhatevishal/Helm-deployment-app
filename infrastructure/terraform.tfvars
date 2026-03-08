@@ -1,6 +1,6 @@
 # Project Settings
 project_name = "helm-deployment-app"
-environment  = "prod"
+environment  = "dev"
 location     = "Canada Central"
 
 # Networking
@@ -34,3 +34,4 @@ acr_sku = "Premium"
 tags = {
   owner = "vishal"
 }
+
