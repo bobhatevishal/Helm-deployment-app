@@ -2,6 +2,7 @@ pipeline {
     agent any
 
     parameters {
+        choice(name: 'REGION', choices: ['Canada Central'], description: 'Deployment region')
         choice(name: 'ENVIRONMENT', choices: ['dev', 'qa', 'uat', 'prod', 'dr'], description: 'Deployment environment')
         choice(name: 'ACTION', choices: ['plan', 'apply', 'destroy'], description: 'Terraform action')
         booleanParam(name: 'AUTO_APPROVE', defaultValue: false, description: 'Auto approve apply/destroy actions')
@@ -12,25 +13,20 @@ pipeline {
         ARM_CLIENT_ID       = credentials('aks_sp_client_id')
         ARM_CLIENT_SECRET   = credentials('aks_sp_secret')
         ARM_TENANT_ID       = credentials('aks_sp_tenant_id')
-        VAR_FILE      = "infrastructure/terraform.tfvars"
-        PLAN_FILE     = "${ENVIRONMENT}.plan"
+        ARM_SUBSCRIPTION_ID = credentials("subscription_id_${params.ENVIRONMENT ?: 'dev'}")
+        PLAN_FILE           = "${params.ENVIRONMENT ?: 'dev'}.plan"
     }
 
     stages {
         stage('Azure Login') {
-            environment {
-                // Building the credential ID string here
-                SUB_CRED_ID = "subscription_id_${ENVIRONMENT}"
-                ARM_SUBSCRIPTION_ID = credentials("${SUB_CRED_ID}")
-            }
             steps {
                 sh """
                     az login --service-principal \
-                        --username "${ARM_CLIENT_ID}" \
-                                --password "${ARM_CLIENT_SECRET}" \
-                                --tenant "${ARM_TENANT_ID}"
+                        --username "${env.ARM_CLIENT_ID}" \
+                        --password "${env.ARM_CLIENT_SECRET}" \
+                        --tenant "${env.ARM_TENANT_ID}"
 
-                    az account set --subscription "${ARM_SUBSCRIPTION_ID}"
+                    az account set --subscription "${env.ARM_SUBSCRIPTION_ID}"
                 """
             }
         }
@@ -49,32 +45,29 @@ pipeline {
 
         stage('Terraform Plan') {
             when {
-                expression { ACTION in ['plan', 'apply', 'destroy'] }
-            }
-            environment {
-                SUB_CRED_ID = "subscription_id_${ENVIRONMENT}"
-                ARM_SUBSCRIPTION_ID = credentials("${SUB_CRED_ID}")
+                expression { params.ACTION in ['plan', 'apply', 'destroy'] }
             }
             steps {
                 sh """
                     terraform -chdir=infrastructure plan \
-                        -var="subscription_id=${ARM_SUBSCRIPTION_ID}" \
+                        -var="subscription_id=${env.ARM_SUBSCRIPTION_ID}" \
                         -var-file="terraform.tfvars" \
-                        -out="../${PLAN_FILE}"
+                        -out="../${env.PLAN_FILE}"
                 """
             }
         }
 
         stage('Approval Required') {
             when {
-                expression { (ACTION in ['apply', 'destroy']) && AUTO_APPROVE == false }
+                expression { (params.ACTION in ['apply', 'destroy']) && params.AUTO_APPROVE == false }
             }
             steps {
                 timeout(time: 20, unit: 'MINUTES') {
                     input(
                         message: """Approval required for Terraform action.
-                        Environment: ${ENVIRONMENT}
-                        Action: ${ACTION}
+                        Region: ${params.REGION}
+                        Environment: ${params.ENVIRONMENT}
+                        Action: ${params.ACTION}
                         Proceed?"""
                     )
                 }
@@ -83,25 +76,21 @@ pipeline {
 
         stage('Terraform Apply') {
             when {
-                expression { ACTION == 'apply' }
+                expression { params.ACTION == 'apply' }
             }
             steps {
-                sh "terraform -chdir=infrastructure apply -auto-approve ../${PLAN_FILE}"
+                sh "terraform -chdir=infrastructure apply -auto-approve ../${env.PLAN_FILE}"
             }
         }
 
         stage('Terraform Destroy') {
             when {
-                expression { ACTION == 'destroy' }
-            }
-            environment {
-                SUB_CRED_ID = "subscription_id_${ENVIRONMENT}"
-                ARM_SUBSCRIPTION_ID = credentials("${SUB_CRED_ID}")
+                expression { params.ACTION == 'destroy' }
             }
             steps {
                 sh """
                     terraform -chdir=infrastructure destroy -auto-approve \
-                        -var="subscription_id=${ARM_SUBSCRIPTION_ID}" \
+                        -var="subscription_id=${env.ARM_SUBSCRIPTION_ID}" \
                         -var-file="terraform.tfvars"
                 """
             }
@@ -114,10 +103,10 @@ pipeline {
             cleanWs()
         }
         success {
-            echo "Terraform completed successfully for ${ENVIRONMENT} with action ${ACTION}"
+            echo "Terraform completed successfully for ${params.REGION} - ${params.ENVIRONMENT} with action ${params.ACTION}"
         }
         failure {
-            echo "Terraform failed for ${ENVIRONMENT} with action ${ACTION}"
+            echo "Terraform failed for ${params.REGION} - ${params.ENVIRONMENT} with action ${params.ACTION}"
         }
     }
 }
