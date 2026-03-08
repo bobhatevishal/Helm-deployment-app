@@ -1,18 +1,24 @@
 pipeline {
     agent any
 
+    parameters {
+        choice(name: 'ENVIRONMENT', choices: ['dev', 'qa','uat', 'prod', 'dr'], description: 'Select the target environment')
+    }
+
     environment {
+        SUB_CRED_ID         = "subscription_id_${params.ENVIRONMENT}"
         // Azure Credentials for Login
         ARM_CLIENT_ID       = credentials('aks_sp_client_id')
         ARM_CLIENT_SECRET   = credentials('aks_sp_secret')
         ARM_TENANT_ID       = credentials('aks_sp_tenant_id')
-        ARM_SUBSCRIPTION_ID = '90266433-ff7d-467c-becb-788ee06b5e27'
-        
-        // Dynamic infrastructure parameters
-        // Hardcoded standard prod cluster for helm-deployment-app
-        ACR_NAME         = "helmdeploymentappprodacr"
-        AKS_CLUSTER_NAME = "helm-deployment-app-prod-aks"
-        RESOURCE_GROUP   = "helm-deployment-app-prod-rg"
+        ARM_SUBSCRIPTION_ID = credentials("${env.SUB_CRED_ID}")
+        // Database Credentials
+        DB_USER          = credentials('db_user')
+        DB_PASS          = credentials('db_password')
+        // Infrastructure parameters
+        ACR_NAME         = "helmdeploymentapp${params.ENVIRONMENT}acr"
+        AKS_CLUSTER_NAME = "helm-deployment-app-${params.ENVIRONMENT}-aks"
+        RESOURCE_GROUP   = "helm-deployment-app-${params.ENVIRONMENT}-rg"
         IMAGE_TAG        = "${env.BUILD_NUMBER}"
     }
 
@@ -53,11 +59,7 @@ pipeline {
                     ]
 
                     services.each { dir, repo ->
-                        echo "Building and pushing ${repo}..."
-                        sh """
-                            docker build -t ${ACR_NAME}.azurecr.io/${repo}:${IMAGE_TAG} src/${dir}
-                            docker push ${ACR_NAME}.azurecr.io/${repo}:${IMAGE_TAG}
-                        """
+                        buildAndPushImage(dir, repo, env.ACR_NAME, env.IMAGE_TAG)
                     }
                 }
             }
@@ -69,7 +71,9 @@ pipeline {
                     helm upgrade --install snaplink kube/snaplink \
                         --namespace default \
                         --set global.imageRegistry=${ACR_NAME}.azurecr.io \
-                        --set global.imageTag=${IMAGE_TAG}
+                        --set global.imageTag=${IMAGE_TAG} \
+                        --set db.user=${DB_USER} \
+                        --set db.password=${DB_PASS}
                 """
             }
         }
@@ -86,4 +90,13 @@ pipeline {
             echo "Application pipeline failed."
         }
     }
+}
+
+// Function to build and push docker images
+def buildAndPushImage(String dir, String repo, String acrName, String tag) {
+    echo "Building and pushing ${repo}..."
+    sh """
+        docker build -t ${acrName}.azurecr.io/${repo}:${tag} src/${dir}
+        docker push ${acrName}.azurecr.io/${repo}:${tag}
+    """
 }
