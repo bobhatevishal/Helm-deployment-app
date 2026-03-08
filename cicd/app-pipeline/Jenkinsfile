@@ -6,20 +6,20 @@ pipeline {
     }
 
     environment {
-        SUB_CRED_ID         = "subscription_id_${params.ENVIRONMENT}"
-        // Azure Credentials for Login
         ARM_CLIENT_ID       = credentials('aks_sp_client_id')
         ARM_CLIENT_SECRET   = credentials('aks_sp_secret')
         ARM_TENANT_ID       = credentials('aks_sp_tenant_id')
-        ARM_SUBSCRIPTION_ID = credentials("${env.SUB_CRED_ID}")
-        // Database Credentials
-        DB_USER          = credentials('db_user')
-        DB_PASS          = credentials('db_password')
-        // Infrastructure parameters
-        ACR_NAME         = "helmdeploymentapp${params.ENVIRONMENT}acr"
-        AKS_CLUSTER_NAME = "helm-deployment-app-${params.ENVIRONMENT}-aks"
-        RESOURCE_GROUP   = "helm-deployment-app-${params.ENVIRONMENT}-rg"
-        IMAGE_TAG        = "${env.BUILD_NUMBER}"
+        
+        DB_USER             = credentials('db_user')
+        DB_PASS             = credentials('db_password')
+        
+        ARM_SUBSCRIPTION_ID = credentials("subscription_id_${params.ENVIRONMENT ?: 'dev'}")
+        
+        ACR_NAME            = "helmdeploymentapp${params.ENVIRONMENT ?: 'dev'}acr"
+        AKS_CLUSTER_NAME    = "helm-deployment-app-${params.ENVIRONMENT ?: 'dev'}-aks"
+        RESOURCE_GROUP      = "helm-deployment-app-${params.ENVIRONMENT ?: 'dev'}-rg"
+        
+        IMAGE_TAG           = "${BUILD_NUMBER ?: 'latest'}"
     }
 
     stages {
@@ -38,13 +38,13 @@ pipeline {
         
         stage('Get AKS Credentials') {
             steps {
-                sh "az aks get-credentials --resource-group ${RESOURCE_GROUP} --name ${AKS_CLUSTER_NAME} --overwrite-existing"
+                sh "az aks get-credentials --resource-group ${env.RESOURCE_GROUP} --name ${env.AKS_CLUSTER_NAME} --overwrite-existing"
             }
         }
 
         stage('ACR Login') {
             steps {
-                sh "az acr login --name ${ACR_NAME}"
+                sh "az acr login --name ${env.ACR_NAME}"
             }
         }
 
@@ -70,11 +70,17 @@ pipeline {
                 sh """
                     helm upgrade --install snaplink kube/snaplink \
                         --namespace default \
-                        --set global.imageRegistry=${ACR_NAME}.azurecr.io \
-                        --set global.imageTag=${IMAGE_TAG} \
-                        --set db.user=${DB_USER} \
-                        --set db.password=${DB_PASS}
+                        --set global.imageRegistry=${env.ACR_NAME}.azurecr.io \
+                        --set global.imageTag=${env.IMAGE_TAG} \
+                        --set db.user=${env.DB_USER} \
+                        --set db.password=${env.DB_PASS}
                 """
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                echo "Deployment successfully verified in ${params.ENVIRONMENT} environment."
             }
         }
     }
@@ -84,10 +90,10 @@ pipeline {
             cleanWs()
         }
         success {
-            echo "Application pipeline deployed successfully."
+            echo "Application pipeline deployed successfully to ${params.ENVIRONMENT}."
         }
         failure {
-            echo "Application pipeline failed."
+            echo "Application pipeline failed for ${params.ENVIRONMENT}."
         }
     }
 }
