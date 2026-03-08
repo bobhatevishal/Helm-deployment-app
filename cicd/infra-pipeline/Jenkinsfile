@@ -8,14 +8,14 @@ pipeline {
     }
 
     environment {
-        SUB_CRED_ID         = "subscription_id_${env.ENVIRONMENT ?: 'dev'}"
+        SUB_CRED_ID         = "subscription_id_${env?.ENVIRONMENT ?: params?.ENVIRONMENT ?: 'dev'}"
         // Service Principal Credentials
         ARM_CLIENT_ID       = credentials('aks_sp_client_id')
         ARM_CLIENT_SECRET   = credentials('aks_sp_secret')
         ARM_TENANT_ID       = credentials('aks_sp_tenant_id')
         ARM_SUBSCRIPTION_ID = credentials("${env.SUB_CRED_ID}")
         // Paths and Files
-        PLAN_FILE     = "${env.ENVIRONMENT ?: 'dev'}.plan"
+        PLAN_FILE     = "${env?.ENVIRONMENT ?: params?.ENVIRONMENT ?: 'dev'}.plan"
     }
 
     stages {
@@ -66,8 +66,8 @@ pipeline {
                 timeout(time: 20, unit: 'MINUTES') {
                     input(
                         message: """Approval required for Terraform action.
-                        Environment: ${env.ENVIRONMENT ?: 'dev'}
-                        Action: ${env.ACTION ?: 'plan'}
+                        Environment: ${env?.ENVIRONMENT ?: params?.ENVIRONMENT ?: 'dev'}
+                        Action: ${env?.ACTION ?: params?.ACTION ?: 'plan'}
                         Proceed?"""
                     )
                 }
@@ -102,10 +102,10 @@ pipeline {
             echo 'Pipeline completed.'
         }
         success {
-            echo "Terraform completed successfully for ${env.ENVIRONMENT ?: 'dev'} with action ${env.ACTION ?: 'plan'}"
+            echo "Terraform completed successfully for ${env?.ENVIRONMENT ?: params?.ENVIRONMENT ?: 'dev'} with action ${env?.ACTION ?: params?.ACTION ?: 'plan'}"
         }
         failure {
-            echo "Terraform failed for ${env.ENVIRONMENT ?: 'dev'} with action ${env.ACTION ?: 'plan'}"
+            echo "Terraform failed for ${env?.ENVIRONMENT ?: params?.ENVIRONMENT ?: 'dev'} with action ${env?.ACTION ?: params?.ACTION ?: 'plan'}"
         }
     }
 }
