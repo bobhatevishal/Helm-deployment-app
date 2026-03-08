@@ -8,14 +8,14 @@ pipeline {
     }
 
     environment {
-        SUB_CRED_ID         = "subscription_id_${params.ENVIRONMENT}"
+        SUB_CRED_ID         = "subscription_id_${params?.ENVIRONMENT ?: 'dev'}"
         // Service Principal Credentials
         ARM_CLIENT_ID       = credentials('aks_sp_client_id')
         ARM_CLIENT_SECRET   = credentials('aks_sp_secret')
         ARM_TENANT_ID       = credentials('aks_sp_tenant_id')
         ARM_SUBSCRIPTION_ID = credentials("${env.SUB_CRED_ID}")
         // Paths and Files
-        PLAN_FILE     = "${params.ENVIRONMENT}.plan"
+        PLAN_FILE     = "${params?.ENVIRONMENT ?: 'dev'}.plan"
     }
 
     stages {
