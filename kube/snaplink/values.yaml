@@ -1,5 +1,5 @@
 global:
-  imageRegistry: "helmdeploymentappprodacr.azurecr.io"
+  imageRegistry: ""
   imageTag: "latest"
 
 frontend:
@@ -13,8 +13,12 @@ api:
 db:
   repository: "snaplink-db"
   servicePort: 5432
+  user: ""
+  password: ""
+  name: "urlshort"
 
 redis:
   repository: "snaplink-cache"
   servicePort: 6379
+
 
