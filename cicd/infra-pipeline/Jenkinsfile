@@ -12,26 +12,29 @@ pipeline {
         ARM_CLIENT_ID       = credentials('aks_sp_client_id')
         ARM_CLIENT_SECRET   = credentials('aks_sp_secret')
         ARM_TENANT_ID       = credentials('aks_sp_tenant_id')
-        ENV_NAME            = "${env.ENVIRONMENT ?: 'dev'}"
-        PLAN_FILE           = "${env.ENVIRONMENT ?: 'dev'}.plan"
+        
+        // Safety Defaults (Avoid 'env.' prefix here to fix NPE)
+        TARGET_ENV          = "${params?.ENVIRONMENT ?: 'dev'}"
+        PLAN_FILE           = "${params?.ENVIRONMENT ?: 'dev'}.plan"
     }
 
     stages {
         stage('Infrastructure Setup') {
             environment {
-                SUB_CRED_ID         = "subscription_id_${env.ENVIRONMENT ?: 'dev'}"
-                ARM_SUBSCRIPTION_ID = credentials("${env.SUB_CRED_ID}")
+                // Dynamic subscription selector
+                SUB_CRED_ID         = "subscription_id_${params?.ENVIRONMENT ?: 'dev'}"
+                ARM_SUBSCRIPTION_ID = credentials("${SUB_CRED_ID}")
             }
             stages {
                 stage('Azure Login') {
                     steps {
                         sh """
                             az login --service-principal \
-                                --username "${env.ARM_CLIENT_ID}" \
-                                --password "${env.ARM_CLIENT_SECRET}" \
-                                --tenant "${env.ARM_TENANT_ID}"
+                                --username "${ARM_CLIENT_ID}" \
+                                --password "${ARM_CLIENT_SECRET}" \
+                                --tenant "${ARM_TENANT_ID}"
 
-                            az account set --subscription "${env.ARM_SUBSCRIPTION_ID}"
+                            az account set --subscription "${ARM_SUBSCRIPTION_ID}"
                         """
                     }
                 }
@@ -55,9 +58,9 @@ pipeline {
                     steps {
                         sh """
                             terraform -chdir=infrastructure plan \
-                                -var="subscription_id=${env.ARM_SUBSCRIPTION_ID}" \
+                                -var="subscription_id=${ARM_SUBSCRIPTION_ID}" \
                                 -var-file="terraform.tfvars" \
-                                -out="../${env.PLAN_FILE}"
+                                -out="../${PLAN_FILE}"
                         """
                     }
                 }
@@ -70,7 +73,7 @@ pipeline {
                         timeout(time: 20, unit: 'MINUTES') {
                             input(
                                 message: """Approval required for Terraform action.
-                                Environment: ${env.ENV_NAME}
+                                Environment: ${TARGET_ENV}
                                 Action: ${params.ACTION}
                                 Proceed?"""
                             )
@@ -83,7 +86,7 @@ pipeline {
                         expression { params.ACTION == 'apply' }
                     }
                     steps {
-                        sh "terraform -chdir=infrastructure apply -auto-approve ../${env.PLAN_FILE}"
+                        sh "terraform -chdir=infrastructure apply -auto-approve ../${PLAN_FILE}"
                     }
                 }
 
@@ -94,7 +97,7 @@ pipeline {
                     steps {
                         sh """
                             terraform -chdir=infrastructure destroy -auto-approve \
-                                -var="subscription_id=${env.ARM_SUBSCRIPTION_ID}" \
+                                -var="subscription_id=${ARM_SUBSCRIPTION_ID}" \
                                 -var-file="terraform.tfvars"
                         """
                     }
@@ -109,10 +112,10 @@ pipeline {
             cleanWs()
         }
         success {
-            echo "Terraform completed successfully for ${env.ENV_NAME} with action ${params.ACTION}"
+            echo "Terraform completed successfully for ${TARGET_ENV} with action ${params.ACTION}"
         }
         failure {
-            echo "Terraform failed for ${env.ENV_NAME} with action ${params.ACTION}"
+            echo "Terraform failed for ${TARGET_ENV} with action ${params.ACTION}"
         }
     }
 }
