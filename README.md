@@ -80,3 +80,5 @@ Each microservice has its own dedicated pipeline for independent lifecycle manag
 * **Azure Authentication:** Jenkins uses secured **Azure Service Principals** (`ARM_CLIENT_ID`, `ARM_CLIENT_SECRET`, `ARM_TENANT_ID`) stored in Jenkins credentials to authenticate and manage Azure resources via Terraform and the Azure CLI.
 * **Subscription Isolation:** To enforce strict logical isolation, prevent accidental cross-environment deployments, and simplify cost management, **each environment (dev, qa, uat, prod) utilizes a dedicated and distinct Azure Subscription ID.**
 * **Secret Management:** Database passwords and other sensitive configuration secrets are injected into the Helm deployments securely via the CI/CD pipeline, ensuring that no hardcoded secrets reside in the source code repository.
+<img width="940" height="513" alt="image" src="https://github.com/user-attachments/assets/88bf3770-3e9a-43aa-a947-4a6c0a8a860d" />
+
