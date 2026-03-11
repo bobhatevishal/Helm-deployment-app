@@ -1,23 +1,15 @@
-my-new-service:
-  nameOverride: "sample-app"
-  replicaCount: 2
+nameOverride: "frontend"
 
-  image:
-    repository: "my-sample-app"
-    tag: "v1.0.0"
+global:
+  imageRegistry: "helmdeploymentappdevacr.azurecr.io"
 
-  service:
-    port: 8080
+image:
+  repository: <repo_name>
+  tag: <image_tag>
 
-  ingress:
-    enabled: true
-    domain: "app.yourdomain.com"
+service:
+  port: 80
 
-  env:
-    - name: ENVIRONMENT
-      value: "production"
-    - name: DATABASE_PASSWORD
-      valueFrom:
-        secretKeyRef:
-          name: my-database-secret-name
-          key: password
+ingress:
+  enabled: true
+  domain: "snaplink.com"
