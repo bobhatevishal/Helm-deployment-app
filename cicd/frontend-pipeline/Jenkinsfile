@@ -17,10 +17,6 @@ pipeline {
         SUB_ID_QA           = credentials('subscription_id_qa')
         SUB_ID_UAT          = credentials('subscription_id_uat')
         SUB_ID_PROD         = credentials('subscription_id_prod')
-
-        // App Database Credentials
-        DB_USER             = credentials('db_user')
-        DB_PASS             = credentials('db_password')
         
         PROJECT_NAME        = "helmdeploymentapp"
         
@@ -28,6 +24,7 @@ pipeline {
         COMPONENT_DIR       = "frontend"
         COMPONENT_REPO      = "snaplink-web"
         HELM_COMPONENT      = "frontend"
+        HELM_VALUES_FILE    = "kube/snaplink/values/frontend.yaml"
         
         // Tag Logic
         COMMIT_ID           = "${env.GIT_COMMIT ? env.GIT_COMMIT.take(8) : ''}"
@@ -187,19 +184,19 @@ def deployToAKS(envName) {
     
     sh """
         az aks get-credentials --resource-group ${resourceGroup} --name ${clusterName} --overwrite-existing
-        if helm status snaplink --namespace default > /dev/null 2>&1; then
+        if helm status ${env.HELM_COMPONENT} > /dev/null 2>&1; then
             HELM_UPGRADE_OPT="--reuse-values"
         else
             HELM_UPGRADE_OPT=""
         fi
 
-        helm upgrade --install snaplink kube/snaplink \\
-            --namespace default \\
+        sed -i -e "s|<registry>|${targetAcrName}.azurecr.io|g" \\
+           -e "s|<repo_name>|${COMPONENT_REPO}|g" \\
+           -e "s|<image_tag>|${RESOLVED_TAG}|g" ${HELM_VALUES_FILE}
+
+        helm upgrade --install ${env.HELM_COMPONENT} kube/snaplink \\
             \$HELM_UPGRADE_OPT \\
-            --set global.imageRegistry=${targetAcrName}.azurecr.io \\
-            --set ${env.HELM_COMPONENT}.imageTag=${env.RESOLVED_TAG} \\
-            --set db.user=${env.DB_USER} \\
-            --set db.password=${env.DB_PASS}
+            -f ${HELM_VALUES_FILE}
     """
 }
 

@@ -1,0 +1,21 @@
+nameOverride: "db"
+namespace: "snaplink-ns"
+
+# ADDED: Required by the template to build the full image URL
+global:
+  imageRegistry: <registry> # <-- Update with your actual registry
+
+image:
+  repository: <repo_name>
+  tag: <image_tag> # <-- ADDED: Required by the template
+
+service:
+  port: 5432
+
+env:
+  - name: POSTGRES_USER
+    value: <DB_USER>
+  - name: POSTGRES_PASSWORD
+    value: <DB_PASS>
+  - name: POSTGRES_DB
+    value: "urlshort"

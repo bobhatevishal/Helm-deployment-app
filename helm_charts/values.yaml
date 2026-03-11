@@ -1,0 +1,23 @@
+my-new-service:
+  nameOverride: "sample-app"
+  replicaCount: 2
+
+  image:
+    repository: "my-sample-app"
+    tag: "v1.0.0"
+
+  service:
+    port: 8080
+
+  ingress:
+    enabled: true
+    domain: "app.yourdomain.com"
+
+  env:
+    - name: ENVIRONMENT
+      value: "production"
+    - name: DATABASE_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: my-database-secret-name
+          key: password

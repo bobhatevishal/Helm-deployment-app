@@ -17,7 +17,7 @@ pipeline {
         SUB_ID_QA           = credentials('subscription_id_qa')
         SUB_ID_UAT          = credentials('subscription_id_uat')
         SUB_ID_PROD         = credentials('subscription_id_prod')
-
+        
         // App Database Credentials
         DB_USER             = credentials('db_user')
         DB_PASS             = credentials('db_password')
@@ -28,10 +28,12 @@ pipeline {
         COMPONENT_DIR       = "api"
         COMPONENT_REPO      = "snaplink-api"
         HELM_COMPONENT      = "api"
-        
+        HELM_VALUES_FILE    = "kube/snaplink/values/api.yaml"   
+
         // Tag Logic
         COMMIT_ID           = "${env.GIT_COMMIT ? env.GIT_COMMIT.take(8) : ''}"
         RESOLVED_TAG        = "${params.IMAGE_TAG ?: env.COMPONENT_DIR + '-' + env.COMMIT_ID}"
+     
     }
 
     stages {
@@ -187,19 +189,22 @@ def deployToAKS(envName) {
     
     sh """
         az aks get-credentials --resource-group ${resourceGroup} --name ${clusterName} --overwrite-existing
-        if helm status snaplink --namespace default > /dev/null 2>&1; then
+        if helm status ${env.HELM_COMPONENT} > /dev/null 2>&1; then
             HELM_UPGRADE_OPT="--reuse-values"
         else
             HELM_UPGRADE_OPT=""
         fi
 
-        helm upgrade --install snaplink kube/snaplink \\
-            --namespace default \\
+        sed -i -e "s|<registry>|${targetAcrName}.azurecr.io|g" \\
+           -e "s|<repo_name>|${COMPONENT_REPO}|g" \\
+           -e "s|<image_tag>|${RESOLVED_TAG}|g" \\
+           -e "s|<DB_USER>|${DB_USER}|g" \\
+           -e "s|<DB_PASS>|${DB_PASS}|g" \\
+           -e "s|<DB_HOST>|${DB_HOST ?: 'db'}|g" ${HELM_VALUES_FILE}
+
+        helm upgrade --install ${env.HELM_COMPONENT} kube/snaplink \\
             \$HELM_UPGRADE_OPT \\
-            --set global.imageRegistry=${targetAcrName}.azurecr.io \\
-            --set ${env.HELM_COMPONENT}.imageTag=${env.RESOLVED_TAG} \\
-            --set db.user=${env.DB_USER} \\
-            --set db.password=${env.DB_PASS}
+            -f ${HELM_VALUES_FILE}
     """
 }
 

@@ -1,0 +1,19 @@
+nameOverride: "redis"
+namespace: "snaplink-ns"
+
+# ADDED: Required by the template to build the full image URL
+global:
+  imageRegistry: <registry> # <-- Update with your actual registry
+
+image:
+  repository: <repo_name>
+  tag: <image_tag>
+
+service:
+  port: 6379
+
+# OPTIONAL: Your template supports environment variables.
+# If your Redis setup doesn't need any (like passwords), you can just leave this out entirely!
+# env:
+#   - name: REDIS_PASSWORD
+#     value: "my-secure-password"
