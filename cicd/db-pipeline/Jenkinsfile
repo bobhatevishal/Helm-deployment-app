@@ -200,7 +200,7 @@ def deployToAKS(envName) {
            -e "s|<DB_USER>|${DB_USER}|g" \\
            -e "s|<DB_PASS>|${DB_PASS}|g" ${HELM_VALUES_FILE}
 
-        helm upgrade --install ${env.HELM_COMPONENT} kube/snaplink \\
+        helm upgrade --install ${env.HELM_COMPONENT} helm_charts \\
             \$HELM_UPGRADE_OPT \\
             -f ${HELM_VALUES_FILE}
     """
