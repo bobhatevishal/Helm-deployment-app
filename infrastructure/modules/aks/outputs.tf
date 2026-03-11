@@ -7,9 +7,10 @@ output "cluster_id" {
 }
 
 output "kube_config" {
-  description = "Raw kubeconfig for the AKS cluster"
+  value       = azurerm_kubernetes_cluster.aks.kube_config_raw
   sensitive   = true
 }
+
 
 output "aks_identity_object_id" {
   value       = azurerm_kubernetes_cluster.aks.identity[0].principal_id
@@ -26,4 +27,5 @@ output "node_resource_group" {
 output "log_analytics_workspace_id" {
   value       = azurerm_log_analytics_workspace.aks.id
 }
+
 
