@@ -170,7 +170,10 @@ def pullTagAndPush(sourceEnv, targetEnv) {
     sh "az acr login --name ${targetAcrName}"
     
     sh """
+        az account set --subscription '${env."SUB_ID_${sourceEnv.toUpperCase()}"}'
         docker pull ${sourceAcrName}.azurecr.io/${env.COMPONENT_REPO}:${env.RESOLVED_TAG}
+        
+        az account set --subscription '${env."SUB_ID_${targetEnv.toUpperCase()}"}'
         docker tag ${sourceAcrName}.azurecr.io/${env.COMPONENT_REPO}:${env.RESOLVED_TAG} ${targetAcrName}.azurecr.io/${env.COMPONENT_REPO}:${env.RESOLVED_TAG}
         docker push ${targetAcrName}.azurecr.io/${env.COMPONENT_REPO}:${env.RESOLVED_TAG}
     """
@@ -188,6 +191,7 @@ def deployToAKS(envName) {
     echo "Deploying Image Tag: ${env.RESOLVED_TAG}"
     
     sh """
+        az account set --subscription '${env."SUB_ID_${envName.toUpperCase()}"}'
         az aks get-credentials --resource-group ${resourceGroup} --name ${clusterName} --overwrite-existing
         if helm status ${env.HELM_COMPONENT} > /dev/null 2>&1; then
             HELM_UPGRADE_OPT="--reuse-values"
