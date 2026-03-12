@@ -24,3 +24,6 @@ env:
   - name: REDIS_URL
     value: "redis://redis:6379/0"
 healthPath: "/api/health"
+probeType: "http"
+ingress:
+  enabled: false

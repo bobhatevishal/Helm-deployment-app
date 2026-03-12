@@ -18,3 +18,6 @@ env:
     value: <DB_PASS>
   - name: POSTGRES_DB
     value: "urlshort"
+probeType: "tcp"
+ingress:
+  enabled: false

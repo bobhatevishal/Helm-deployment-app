@@ -1,7 +1,8 @@
 nameOverride: "redis"
 namespace: "snaplink-ns"
+
 global:
-  imageRegistry: <registry> 
+  imageRegistry: <registry>
 
 image:
   repository: <repo_name>
@@ -10,3 +11,6 @@ image:
 service:
   port: 6379
 
+probeType: "tcp"
+ingress:
+  enabled: false

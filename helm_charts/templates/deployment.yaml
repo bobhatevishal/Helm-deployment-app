@@ -22,15 +22,25 @@ spec:
           ports:
             - containerPort: {{ .Values.service.port }}
           livenessProbe:
+            {{- if eq (.Values.probeType | default "http") "tcp" }}
+            tcpSocket:
+              port: {{ .Values.service.port }}
+            {{- else }}
             httpGet:
               path: {{ .Values.healthPath | default "/" }}
               port: {{ .Values.service.port }}
+            {{- end }}
             initialDelaySeconds: 15
             periodSeconds: 20
           readinessProbe:
+            {{- if eq (.Values.probeType | default "http") "tcp" }}
+            tcpSocket:
+              port: {{ .Values.service.port }}
+            {{- else }}
             httpGet:
               path: {{ .Values.healthPath | default "/" }}
               port: {{ .Values.service.port }}
+            {{- end }}
             initialDelaySeconds: 5
             periodSeconds: 10
           {{- if .Values.env }}
