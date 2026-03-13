@@ -38,7 +38,7 @@ Each environment consists of the following dedicated Azure resources, ensuring l
 * **Azure Kubernetes Service (AKS):** The managed Kubernetes cluster where application pods are orchestrated.
 * **Azure Container Registry (ACR):** A private Docker registry used to store and manage the container images.
 
-## 3. Deployment Strategy (Kubernetes & Helm)
+## 3. Deployment Strategy (Kubernetes & Helm)  
 
 The application components are deployed to AKS using **Helm**, the package manager for Kubernetes. This approach ensures standardized, repeatable, and easily configurable deployments across all four environments.
 
