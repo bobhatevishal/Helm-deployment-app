@@ -25,7 +25,7 @@ pipeline {
         COMPONENT_DIR       = "frontend"
         COMPONENT_REPO      = "snaplink-web"
         HELM_COMPONENT      = "frontend"
-        HELM_VALUES_FILE    = "kube/snaplink/values/${COMPONENT_DIR}-${params.ENVIRONMENT}.yaml"
+        HELM_VALUES_FILE    = "kube/snaplink/values/${params.ENVIRONMENT}/${COMPONENT_DIR}-${params.ENVIRONMENT}.yaml"   
         
         // Tag Logic
         COMMIT_ID           = "${env.GIT_COMMIT ? env.GIT_COMMIT.take(8) : ''}"
