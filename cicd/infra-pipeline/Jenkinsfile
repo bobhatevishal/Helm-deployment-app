@@ -55,7 +55,8 @@ pipeline {
                 echo "----------------------------------------------------------"
                 echo "TERRAFORM: Initializing for ${params.ENVIRONMENT}"
                 sh """
-                    cp infrastructure/backend/${params.ENVIRONMENT}-backend.tf infrastructure/
+                    
+                    
                     terraform -chdir=infrastructure init \
                         -reconfigure \
                         -backend-config="key=${params.ENVIRONMENT}/${params.ENVIRONMENT}.tfstate"
@@ -79,7 +80,7 @@ pipeline {
                 sh """
                     terraform -chdir=infrastructure plan \
                         -var="subscription_id=${env.ARM_SUBSCRIPTION_ID}" \
-                        -var-file="tfvars/${params.ENVIRONMENT}.tfvars" \
+                        -var-file="environment/${params.ENVIRONMENT}/${params.ENVIRONMENT}.tfvars" \
                         -out="../${env.PLAN_FILE}"
                 """
             }
@@ -168,7 +169,7 @@ pipeline {
                 sh """
                     terraform -chdir=infrastructure destroy -auto-approve \
                         -var="subscription_id=${env.ARM_SUBSCRIPTION_ID}" \
-                        -var-file="tfvars/${params.ENVIRONMENT}.tfvars"
+                        -var-file="environment/${params.ENVIRONMENT}/${params.ENVIRONMENT}.tfvars"
                 """
                 echo "TERRAFORM: Successfully destroyed ${params.ENVIRONMENT} resources."
                 echo "----------------------------------------------------------"
