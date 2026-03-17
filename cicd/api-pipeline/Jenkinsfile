@@ -22,6 +22,9 @@ pipeline {
         DB_USER             = credentials('db_user')
         DB_PASS             = credentials('db_password')
         
+        // Git Credentials for GitOps push
+        GIT_USER            = credentials('git-pass')
+        
         PROJECT_NAME        = "helmdeploymentapp"
         PRODUCT_NAME        = "snaplink"
         
@@ -205,9 +208,8 @@ def deployToAKS(envName) {
         git add ${HELM_VALUES_FILE}
         git commit -m "Deploy ${COMPONENT_REPO} to ${envName.toUpperCase()}: ${RESOLVED_TAG} [skip ci]"
         
-        # Note: In a real environment, you need an SSH key or PAT configured for Jenkins to push.
-        # This assumes the Jenkins agent already has permission to push back to the repo.
-        git push origin HEAD:main
+        # Use authenticated URL for push (using environment variables)
+        git push https://${GIT_USER_USR}:${GIT_USER_PSW}@github.com/bobhatevishal/Helm-deployment-app.git HEAD:main
     """
 }
 
