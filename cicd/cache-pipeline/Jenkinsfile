@@ -178,32 +178,29 @@ def pullTagAndPush(sourceEnv, targetEnv) {
 
 def deployToAKS(envName) {
     def targetAcrName = "${env.PROJECT_NAME}${envName}acr"
-    def clusterName = "helm-deployment-app-${envName}-aks"
-    def resourceGroup = "helm-deployment-app-${envName}-rg"
 
     echo "----------------------------------------------------------"
-    echo "DEPLOY: Targeting ${envName.toUpperCase()} AKS Cluster"
-    echo "Cluster Name: ${clusterName}"
+    echo "DEPLOY (GitOps): Updating manifest for ${envName.toUpperCase()}"
     echo "Using Registry: ${targetAcrName}.azurecr.io"
     echo "Deploying Image Tag: ${env.RESOLVED_TAG}"
     
     sh """
-        AZURE_CONFIG_DIR=${env.AZURE_CONFIG_DIR} az account set --subscription '${env."SUB_ID_${envName.toUpperCase()}"}'
-        AZURE_CONFIG_DIR=${env.AZURE_CONFIG_DIR} az aks get-credentials --resource-group ${resourceGroup} --name ${clusterName} --overwrite-existing
-        if helm status ${env.HELM_COMPONENT} > /dev/null 2>&1; then
-            HELM_UPGRADE_OPT="--reuse-values"
-        else
-            HELM_UPGRADE_OPT=""
-        fi
+        # Set up Git for Jenkins user
+        git config user.name "Jenkins CI"
+        git config user.email "jenkins@example.com"
 
+        # We replace the placeholders in the values file and commit the file
         sed -i -e "s|<registry>|${targetAcrName}.azurecr.io|g" \\
            -e "s|<repo_name>|${COMPONENT_REPO}|g" \\
            -e "s|<image_tag>|${RESOLVED_TAG}|g" ${HELM_VALUES_FILE}
 
-        helm upgrade --install ${env.HELM_COMPONENT} helm_charts \\
-            --namespace ${PRODUCT_NAME}-${params.ENVIRONMENT} --create-namespace \\
-            \$HELM_UPGRADE_OPT \\
-            -f ${HELM_VALUES_FILE}
+        # Commit and push via GitOps
+        git add ${HELM_VALUES_FILE}
+        git commit -m "Deploy ${COMPONENT_REPO} to ${envName.toUpperCase()}: ${RESOLVED_TAG} [skip ci]"
+        
+        # Note: In a real environment, you need an SSH key or PAT configured for Jenkins to push.
+        # This assumes the Jenkins agent already has permission to push back to the repo.
+        git push origin HEAD:main
     """
 }
 

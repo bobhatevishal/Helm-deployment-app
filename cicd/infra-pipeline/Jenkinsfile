@@ -160,6 +160,41 @@ pipeline {
             }
         }
 
+        stage('Deploy ArgoCD') {
+            when {
+                expression { params.ACTION == 'apply' }
+            }
+            steps {
+                script {
+                    echo "HELM: Deploying ArgoCD..."
+                    sh """
+                        # 1. Get Cluster Credentials
+                        CLUSTER_NAME=\$(terraform -chdir=infrastructure output -raw aks_cluster_name)
+                        RG_NAME=\$(terraform -chdir=infrastructure output -raw resource_group_name)
+                        az aks get-credentials --resource-group \$RG_NAME --name \$CLUSTER_NAME --overwrite-existing
+
+                        # 2. Add ArgoCD Helm Repository
+                        helm repo add argocd https://argoproj.github.io/argo-helm
+                        helm repo update
+
+                        # 3. Create Namespace (if not exists)
+                        kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+
+                        # 4. Install/Upgrade ArgoCD
+                        helm upgrade --install argocd argocd/argo-cd \
+                            --namespace argocd \
+                            --version 7.4.4 \
+                            --values argocd/argocd-values.yaml \
+                            --wait
+
+                        # 5. Apply App-of-Apps
+                        echo "Applying App-of-Apps..."
+                        kubectl apply -f argocd/app-of-apps.yaml
+                    """
+                }
+            }
+        }
+
         stage('Terraform Destroy') {
             when {
                 expression { params.ACTION == 'destroy' }
